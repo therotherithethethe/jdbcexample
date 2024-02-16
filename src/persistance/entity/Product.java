@@ -1,5 +1,7 @@
 package persistance.entity;
 
+import static java.lang.StringTemplate.STR;
+
 import java.util.UUID;
 
 public class Product {
@@ -13,5 +15,17 @@ public class Product {
 
     public UUID getId() {
         return id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public int getPrice() {
+        return price;
+    }
+    @Override
+    public String toString() {
+        return STR."UUID: \{id}, Name: \{name}, Price: \{price}";
     }
 }

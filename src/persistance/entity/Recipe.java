@@ -16,7 +16,7 @@ public class Recipe {
         this(product, new HashSet<>());
     }
 
-    public UUID getId() {
+    public String getId() {
         return id;
     }
 
