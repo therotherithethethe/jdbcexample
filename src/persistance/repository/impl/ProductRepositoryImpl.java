@@ -5,10 +5,12 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import persistance.entity.Product;
 import persistance.repository.contract.ProductRepository;
 
@@ -30,14 +32,13 @@ public class ProductRepositoryImpl implements ProductRepository {
                 String name = rs.getString("name");
                 int price = rs.getInt("price");
 
-                Product product = new Product(name, price);
+                Product product = new Product(id, name, price);
                 return Optional.of(product);
             }
         } catch (SQLException e) {
             System.out.println(e.getMessage());
         }
 
-        // Return an empty Optional if the product was not found or an exception occurred
         return Optional.empty();
     }
 
@@ -52,7 +53,6 @@ public class ProductRepositoryImpl implements ProductRepository {
             ResultSet rs = pstmt.executeQuery();
 
             while (rs.next()) {
-                // Assuming id is stored as a string in the database
                 String name = rs.getString("name");
                 int price = rs.getInt("price");
 
@@ -76,22 +76,11 @@ public class ProductRepositoryImpl implements ProductRepository {
         try (Connection conn = DriverManager.getConnection(url);
             PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
-            // Set the values for the prepared statement
             pstmt.setString(1, entity.getId().toString());
             pstmt.setString(2, entity.getName());
             pstmt.setInt(3, entity.getPrice());
 
-            // Execute the INSERT statement
-            int affectedRows = pstmt.executeUpdate();
-
-            // Check if the insert was successful
-            if (affectedRows > 0) {
-                // Return the Product entity
-                return;
-            } else {
-                // Handle the case where the product could not be inserted
-                System.out.println("A product was not inserted.");
-            }
+            pstmt.execute(sql);
         } catch (SQLException e) {
             System.out.println(e.getMessage());
         }
@@ -106,26 +95,74 @@ public class ProductRepositoryImpl implements ProductRepository {
             ResultSet rs = pstmt.executeQuery();
 
             if (rs.next() && rs.getInt(1) > 0) {
-                return true; // Product exists
+                return true;
             }
         } catch (SQLException e) {
             System.out.println(e.getMessage());
         }
-        return false; // Product does not exist or error occurred
-    }
-
-    @Override
-    public boolean remove(Product entity) {
         return false;
     }
 
     @Override
+    public boolean remove(Product entity) {
+        String sql = "DELETE FROM Product WHERE id = ?";
+        try(Connection connection = DriverManager.getConnection(url); PreparedStatement pstmt = connection.prepareStatement(sql)) {
+
+
+            pstmt.setString(1, entity.getName());
+            return pstmt.execute();
+
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+            return false;
+        }
+    }
+
+    @Override
     public Product findByName(String name) {
+        String sql = "SELECT * FROM product WHERE name = ?";
+        try(Connection connection = DriverManager.getConnection(url); PreparedStatement pstmt = connection.prepareStatement(sql)) {
+
+
+            pstmt.setString(1, name);
+
+            ResultSet productSet = pstmt.executeQuery();
+            String resultName = productSet.getString("name");
+            UUID id = UUID.fromString(productSet.getString("id"));
+            int price = productSet.getInt("price");
+
+            return new Product(id, resultName, price);
+
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
         return null;
     }
 
     @Override
     public Set<Product> findByPrice(int price) {
-        return null;
+        Set<Product> products = new HashSet<>();
+        String sql = "SELECT * FROM product WHERE price = ?";
+        try(Connection connection = DriverManager.getConnection(url); PreparedStatement pstmt = connection.prepareStatement(sql)) {
+
+
+            pstmt.setInt(1, price);
+
+            ResultSet productSet = pstmt.executeQuery();
+
+
+            while(productSet.next()) {
+                String resultName = productSet.getString("name");
+                UUID id = UUID.fromString(productSet.getString("id"));
+                int productPrice = productSet.getInt("price");
+
+                products.add(new Product(id, resultName, price));
+            }
+
+
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+        return products;
     }
 }
