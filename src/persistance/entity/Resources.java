@@ -2,6 +2,6 @@ package persistance.entity;
 
 import java.util.Map;
 
-public record Resources(Map<Product, Unit> products) {
+public record Resources(Product product, int grams) {
 
 }
