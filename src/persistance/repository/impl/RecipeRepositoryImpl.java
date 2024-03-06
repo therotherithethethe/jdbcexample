@@ -7,7 +7,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -17,6 +16,7 @@ import java.util.stream.Collectors;
 import persistance.entity.Product;
 import persistance.entity.Recipe;
 import persistance.entity.Resources;
+import persistance.repository.Repository;
 import persistance.repository.contract.RecipeRepository;
 
 public class RecipeRepositoryImpl implements RecipeRepository {
@@ -24,29 +24,35 @@ public class RecipeRepositoryImpl implements RecipeRepository {
     private static final String url = "jdbc:sqlite:data/bakery.db";
     @Override
     public Optional<Recipe> findById(UUID id) {
-        String sql = "SELECT * FROM recipes WHERE id = ?";
+        String recipeIngredientsSql = "SELECT * FROM recipe_ingredients WHERE `recipe id` = ?";
+        String recipesSql = "SELECT * FROM recipes WHERE `id` = ?";
+        Repository<Product> prodRepo = new ProductRepositoryImpl();
 
         try (Connection conn = DriverManager.getConnection(url);
-            PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            PreparedStatement recipeIngredientsPtsmt = conn.prepareStatement(recipeIngredientsSql);
+            PreparedStatement recipesPtsmt = conn.prepareStatement(recipesSql)) {
 
-            pstmt.setString(1, id.toString());
+            recipeIngredientsPtsmt.setString(1, id.toString());
+            recipesPtsmt.setString(1, id.toString());
 
-            ResultSet rs = pstmt.executeQuery();
+            ResultSet recipeIngredientsRs = recipeIngredientsPtsmt.executeQuery();
+            ResultSet recipeNameRs = recipesPtsmt.executeQuery();
+            String recipeName = recipeNameRs.getString("name");
 
-            String recipeId = rs.getString("id");
-            String recipeName = rs.getString("name");
-            String[] resourcesGrams = rs.getString("resources").split(",");
-            ProductRepositoryImpl productRepository = new ProductRepositoryImpl();
-            List<Resources> resources = new ArrayList<>();
-            for(int i = 0; i < resourcesGrams.length; i++) {
-                String[] currResourceGram = resourcesGrams[i].split(" ");
-                Product currProduct = productRepository.findByName(currResourceGram[0]);
-                resources.add(new Resources(currProduct, Integer.parseInt(currResourceGram[1])));
+            Set<Resources> ingredients = new HashSet<>();
+            while(recipeIngredientsRs.next()) {
+                String productId = recipeIngredientsRs.getString("product id");
+                Optional<Product> productOpt = prodRepo.findById(UUID.fromString(productId));
+                int grams = recipeIngredientsRs.getInt("weight");
+                if (productOpt.isPresent()) {
+                    Product product = productOpt.get();
+                    ingredients.add(new Resources(product, grams));
+                }
+
             }
-
-            return Optional.of(new Recipe(UUID.fromString(recipeId), recipeName, new HashSet<>(resources)));
+            return Optional.of(new Recipe(id, recipeName, ingredients));
         } catch (SQLException e) {
-            System.out.println(e.getMessage());
+
         }
 
         return Optional.empty();
@@ -55,88 +61,91 @@ public class RecipeRepositoryImpl implements RecipeRepository {
     @Override
     public Set<Recipe> findAll() {
         Set<Recipe> recipes = new HashSet<>();
-        String sql = "SELECT * FROM recipes";
-        try (Connection conn = DriverManager.getConnection(url);
-            Statement stmt = conn.createStatement();
-            ResultSet rs = stmt.executeQuery(sql)) {
+        String sql = "select * from recipes";
 
-            while (rs.next()) {
-                // Assuming the same structure as in findById
-                String recipeId = rs.getString("id");
-                String recipeName = rs.getString("name");
-                String[] resourcesGrams = rs.getString("resources").split(",");
-                ProductRepositoryImpl productRepository = new ProductRepositoryImpl();
-                List<Resources> resources = new ArrayList<>();
-                for (String resourceGram : resourcesGrams) {
-                    String[] currResourceGram = resourceGram.split(" ");
-                    Product currProduct = productRepository.findByName(currResourceGram[0]);
-                    resources.add(new Resources(currProduct, Integer.parseInt(currResourceGram[1])));
+        try (Connection conn = DriverManager.getConnection(url);
+            PreparedStatement recipesPtsmt = conn.prepareStatement(sql)) {
+
+            ResultSet recipesRs = recipesPtsmt.executeQuery();
+
+            while(recipesRs.next()) {
+                String id = recipesRs.getString("id");
+                Optional<Recipe> recipeOpt = findById(UUID.fromString(id));
+                if(recipeOpt.isPresent()) {
+                    Recipe recipe = recipeOpt.get();
+                    recipes.add(recipe);
                 }
-                recipes.add(new Recipe(UUID.fromString(recipeId), recipeName, new HashSet<>(resources)));
+
             }
+
         } catch (SQLException e) {
-            System.out.println(e.getMessage());
         }
         return recipes;
     }
 
     @Override
     public void add(Recipe entity) {
-        String sql = "INSERT INTO recipes (id, name, resources) VALUES (?, ?, ?)";
+        String insertRecipeSql = "INSERT INTO recipes (id, name) VALUES (?, ?)";
+        String insertIngredientSql = "INSERT INTO recipe_ingredients (`recipe id`, `product id`, weight) VALUES (?, ?, ?)";
+
         try (Connection conn = DriverManager.getConnection(url);
-            PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            PreparedStatement insertRecipeStmt = conn.prepareStatement(insertRecipeSql);
+            PreparedStatement insertIngredientStmt = conn.prepareStatement(insertIngredientSql)) {
 
-            pstmt.setString(1, entity.getId().toString());
-            pstmt.setString(2, entity.getName());
-            // Assuming Resources are stored as a concatenated string
-            String resources = entity.getResources().stream()
-                .map(r -> STR."\{r.product().getName()} \{r.grams()}")
-                .collect(Collectors.joining(","));
-            pstmt.setString(3, resources);
+            // Insert the recipe
+            insertRecipeStmt.setString(1, entity.getId().toString());
+            insertRecipeStmt.setString(2, entity.getName());
+            insertRecipeStmt.executeUpdate();
 
-            pstmt.executeUpdate();
+            // Insert each resource/ingredient
+            for (Resources resource : entity.getResources()) {
+                insertIngredientStmt.setString(1, entity.getId().toString());
+                insertIngredientStmt.setString(2, resource.product().getId().toString());
+                insertIngredientStmt.setInt(3, resource.grams());
+                insertIngredientStmt.executeUpdate();
+            }
+
         } catch (SQLException e) {
-            System.out.println(e.getMessage());
         }
-
     }
 
     @Override
     public boolean remove(Recipe entity) {
-        String sql = "DELETE FROM recipes WHERE id = ?";
-        try (Connection conn = DriverManager.getConnection(url);
-            PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        String deleteIngredientsSql = "DELETE FROM recipe_ingredients WHERE `recipe id` = ?";
+        String deleteRecipeSql = "DELETE FROM recipes WHERE id = ?";
 
-            pstmt.setString(1, entity.getId().toString());
-            int affectedRows = pstmt.executeUpdate();
+        try (Connection conn = DriverManager.getConnection(url);
+            PreparedStatement deleteIngredientsStmt = conn.prepareStatement(deleteIngredientsSql);
+            PreparedStatement deleteRecipeStmt = conn.prepareStatement(deleteRecipeSql)) {
+
+            // Delete ingredients
+            deleteIngredientsStmt.setString(1, entity.getId().toString());
+            deleteIngredientsStmt.executeUpdate();
+
+            // Delete the recipe
+            deleteRecipeStmt.setString(1, entity.getId().toString());
+            int affectedRows = deleteRecipeStmt.executeUpdate();
+
             return affectedRows > 0;
         } catch (SQLException e) {
-            System.out.println(e.getMessage());
+            return false;
         }
-        return false;
     }
 
     @Override
     public Set<Recipe> findByName(String name) {
         Set<Recipe> recipes = new HashSet<>();
-        String sql = "SELECT * FROM recipes WHERE name LIKE ?";
-        try (Connection conn = DriverManager.getConnection(url);
-            PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        String sql = "SELECT id FROM recipes WHERE name = ?";
 
-            pstmt.setString(1, "%" + name + "%");
-            ResultSet rs = pstmt.executeQuery();
+        try (Connection conn = DriverManager.getConnection(url);
+            PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, name);
+            ResultSet rs = stmt.executeQuery();
+
             while (rs.next()) {
-                String recipeId = rs.getString("id");
-                String recipeName = rs.getString("name");
-                String[] resourcesGrams = rs.getString("resources").split(",");
-                ProductRepositoryImpl productRepository = new ProductRepositoryImpl();
-                List<Resources> resources = new ArrayList<>();
-                for (String resourceGram : resourcesGrams) {
-                    String[] currResourceGram = resourceGram.split(" ");
-                    Product currProduct = productRepository.findByName(currResourceGram[0]);
-                    resources.add(new Resources(currProduct, Integer.parseInt(currResourceGram[1])));
-                }
-                recipes.add(new Recipe(UUID.fromString(recipeId), recipeName, new HashSet<>(resources)));
+                UUID id = UUID.fromString(rs.getString("id"));
+                findById(id).ifPresent(recipes::add);
             }
         } catch (SQLException e) {
             System.out.println(e.getMessage());
@@ -146,35 +155,46 @@ public class RecipeRepositoryImpl implements RecipeRepository {
 
     @Override
     public Set<Recipe> findByPrice(int price) {
-        Set<Recipe> recipes = new HashSet<>();
-        String sql = "SELECT * FROM recipes WHERE price <= ?";
-        try (Connection conn = DriverManager.getConnection(url);
-            PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        Set<Recipe> matchingRecipes = new HashSet<>();
+        // SQL query to calculate the total price of ingredients for each recipe
+        String sql = "SELECT ri.`recipe id`, SUM(p.price * ri.weight) AS total_price " +
+            "FROM recipe_ingredients ri " +
+            "JOIN product p ON ri.`product id` = p.id " +
+            "GROUP BY ri.`recipe id` " +
+            "HAVING total_price = ?";
 
-            pstmt.setInt(1, price);
-            ResultSet rs = pstmt.executeQuery();
+        try (Connection conn = DriverManager.getConnection(url);
+            PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, price); // Set the price to match against the total price of ingredients
+            ResultSet rs = stmt.executeQuery();
+
+            // Iterate through the results and find recipes by ID
             while (rs.next()) {
-                Recipe recipe = createRecipeFromResultSet(rs);
-                recipes.add(recipe);
+                UUID recipeId = UUID.fromString(rs.getString("recipe id"));
+                findById(recipeId).ifPresent(matchingRecipes::add);
             }
         } catch (SQLException e) {
             System.out.println(e.getMessage());
         }
-        return recipes;
+
+        return matchingRecipes;
     }
 
     @Override
     public Set<Recipe> findByProduct(Product product) {
         Set<Recipe> recipes = new HashSet<>();
-        String sql = "SELECT r.* FROM recipes r JOIN recipe_products rp ON r.id = rp.recipe_id WHERE rp.product_id = ?";
-        try (Connection conn = DriverManager.getConnection(url);
-            PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        String sql = "SELECT DISTINCT `recipe id` FROM recipe_ingredients WHERE `product id` = ?";
 
-            pstmt.setString(1, product.getId().toString()); // Assuming product ID is the linking attribute
-            ResultSet rs = pstmt.executeQuery();
+        try (Connection conn = DriverManager.getConnection(url);
+            PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, product.getId().toString());
+            ResultSet rs = stmt.executeQuery();
+
             while (rs.next()) {
-                Recipe recipe = createRecipeFromResultSet(rs);
-                recipes.add(recipe);
+                UUID recipeId = UUID.fromString(rs.getString("recipe id"));
+                findById(recipeId).ifPresent(recipes::add);
             }
         } catch (SQLException e) {
             System.out.println(e.getMessage());

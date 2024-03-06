@@ -8,10 +8,10 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="sqlite-jdbc-3.45.1.0" level="project" />
-    <orderEntry type="library" name="slf4j-api-2.0.12" level="project" />
     <orderEntry type="library" name="slf4j-simple-2.0.12" level="project" />
+    <orderEntry type="library" name="slf4j-api-2.0.12" level="project" />
   </component>
   <component name="SonarLintModuleSettings">
-    <option name="uniqueId" value="572d0957-fad8-40cb-8b16-f3bcc23466c4" />
+    <option name="uniqueId" value="25ea08b8-43a6-42fa-b6b6-d0323fb5fdd9" />
   </component>
 </module>
