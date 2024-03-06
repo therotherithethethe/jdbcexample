@@ -30,4 +30,22 @@ public class Recipe {
         return new HashSet<>(resources);
     }
 
+    public interface RecipeBuilder {
+        Recipe build();
+    }
+    public interface RecipeBuilderResources {
+        RecipeBuilder resources(Set<Resources> resources);
+    }
+    public interface RecipeBuilderName {
+        RecipeBuilderResources name(String name);
+    }
+    public interface RecipeBuilderId {
+        RecipeBuilderName id(UUID id);
+    }
+    public static RecipeBuilderId builderId() {
+        return id -> name -> resources -> () -> new Recipe(id, name, resources);
+    }
+    public static RecipeBuilderName builder() {
+        return name -> resources -> () -> new Recipe(name, resources);
+    }
 }

@@ -5,28 +5,31 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import persistance.entity.Product;
 import persistance.entity.Recipe;
 import persistance.entity.Resources;
 import persistance.repository.Repository;
 import persistance.repository.contract.RecipeRepository;
 
-public class RecipeRepositoryImpl implements RecipeRepository {
-
+public class RecipeRepositoryImplSingleton implements RecipeRepository {
+    private static RecipeRepositoryImplSingleton instance;
+    private RecipeRepositoryImplSingleton() {}
+    public static synchronized RecipeRepositoryImplSingleton getInstance() {
+        if (instance == null) {
+            instance = new RecipeRepositoryImplSingleton();
+        }
+        return instance;
+    }
     private static final String url = "jdbc:sqlite:data/bakery.db";
     @Override
     public Optional<Recipe> findById(UUID id) {
         String recipeIngredientsSql = "SELECT * FROM recipe_ingredients WHERE `recipe id` = ?";
         String recipesSql = "SELECT * FROM recipes WHERE `id` = ?";
-        Repository<Product> prodRepo = new ProductRepositoryImpl();
+        Repository<Product> prodRepo = ProductRepositoryImplSingleton.getInstance();
 
         try (Connection conn = DriverManager.getConnection(url);
             PreparedStatement recipeIngredientsPtsmt = conn.prepareStatement(recipeIngredientsSql);

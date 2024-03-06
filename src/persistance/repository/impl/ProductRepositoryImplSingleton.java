@@ -5,17 +5,23 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 import persistance.entity.Product;
 import persistance.repository.contract.ProductRepository;
 
-public class ProductRepositoryImpl implements ProductRepository {
+public class ProductRepositoryImplSingleton implements ProductRepository {
 
+    private static ProductRepositoryImplSingleton instance;
+    public static synchronized ProductRepositoryImplSingleton getInstance() {
+        if (instance == null) {
+            instance = new ProductRepositoryImplSingleton();
+        }
+        return instance;
+    }
+    private ProductRepositoryImplSingleton() {}
     private static final String url = "jdbc:sqlite:data/bakery.db";
     @Override
     public Optional<Product> findById(UUID id) {

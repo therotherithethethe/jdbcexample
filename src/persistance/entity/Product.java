@@ -34,4 +34,23 @@ public class Product {
     public String toString() {
         return STR."UUID: \{id.toString()}, Name: \{name}, Price: \{price}";
     }
+    public interface ProductBuilder {
+        Product build();
+    }
+    public interface ProductBuilderName {
+        ProductBuilder name(String name);
+    }
+    public interface ProductBuilderPrice {
+        ProductBuilderName price(int price);
+    }
+    public interface ProductBuilderId {
+        ProductBuilderPrice id(UUID id);
+    }
+    public static ProductBuilderId builderId() {
+        return id -> name -> price -> () -> new Product(id, price, name);
+    }
+    public static ProductBuilderPrice builder() {
+        return name -> price -> () -> new Product(price, name);
+    }
+
 }
