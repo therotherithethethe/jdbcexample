@@ -2,11 +2,13 @@ package persistance.entity;
 
 import static java.lang.StringTemplate.STR;
 
+import java.util.List;
 import java.util.UUID;
 
-public class Product {
-    public final UUID id;
-    public String name;
+public class Product extends ValidatableEntityNotifier{
+    //public List<String> validationMessages;
+    //public final UUID id;
+    //public String name;
     public int price;
     public Product(String name, int price) {
         id = UUID.randomUUID();
@@ -19,13 +21,13 @@ public class Product {
         this.price = price;
     }
 
-    public UUID getId() {
+   /* public UUID getId() {
         return id;
     }
 
     public String getName() {
         return name;
-    }
+    }*/
 
     public int getPrice() {
         return price;

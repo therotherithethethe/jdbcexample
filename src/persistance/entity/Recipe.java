@@ -4,10 +4,10 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
-public class Recipe {
+public class Recipe extends ValidatableEntityNotifier{
     public final UUID id;
     public Set<Resources> resources = new HashSet<>();
-    public String name;
+    //public String name;
     public Recipe(String name, Set<Resources> resources) {
         this.id = UUID.randomUUID();
         this.name = name;
@@ -18,13 +18,13 @@ public class Recipe {
         this.name = name;
         this.resources = resources;
     }
-    public UUID getId() {
+   /* public UUID getId() {
         return id;
     }
 
     public String getName() {
         return name;
-    }
+    }*/
 
     public Set<Resources> getResources() {
         return new HashSet<>(resources);
